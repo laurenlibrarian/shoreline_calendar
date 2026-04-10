@@ -1,8 +1,6 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' https://corsproxy.io https://api.allorigins.win https://api.codetabs.com https://outlook.office365.com;">
 <title>Shoreline Calendar</title>
 <style>
@@ -274,14 +272,14 @@
     <div class="cal-range" id="range-label" aria-live="polite" aria-atomic="true"></div>
     <div class="cal-controls">
       <button class="today-btn" id="btn-today" aria-label="Go to today's week">Today</button>
-      <button class="nav-btn" id="btn-prev" aria-label="Previous week">&#8249;</button>
-      <button class="nav-btn" id="btn-next" aria-label="Next week">&#8250;</button>
+      <button class="nav-btn" id="btn-prev" aria-label="Previous week">‹</button>
+      <button class="nav-btn" id="btn-next" aria-label="Next week">›</button>
     </div>
   </div>
 
-  <div id="status" role="status" aria-live="polite">Loading calendar…</div>
+  <div id="status" role="status" aria-live="polite" class="status-error">Could not load calendar data due to browser security restrictions (CORS).<br><br>To fix this permanently, see the instructions below the calendar, or ask your web developer to add a server-side proxy for the ICS feed.<br><br><a href="https://outlook.office365.com/owa/calendar/f3ba4e62469a4e68a519c2a475ac630a@shoreline.edu/463717dcbd764361a85485322f44055210645257784221443501/reachcalendar.ics" style="color:inherit;text-decoration:underline">Click here to verify the feed is reachable</a>.</div>
 
-  <div id="grid-wrap" hidden>
+  <div id="grid-wrap" hidden="">
     <div class="week-grid" role="grid" aria-label="Week calendar">
       <div class="day-headers" role="row" aria-label="Days of the week">
         <!-- injected -->
@@ -295,9 +293,9 @@
 </main>
 
 <!-- Event detail modal (hidden until triggered) -->
-<div class="modal-backdrop" id="modal-backdrop" hidden role="dialog" aria-modal="true" aria-labelledby="modal-title">
+<div class="modal-backdrop" id="modal-backdrop" hidden="" role="dialog" aria-modal="true" aria-labelledby="modal-title">
   <div class="modal" id="modal">
-    <button class="modal-close" id="modal-close" aria-label="Close event details">&#x2715;</button>
+    <button class="modal-close" id="modal-close" aria-label="Close event details">✕</button>
     <div class="modal-title" id="modal-title"></div>
     <div class="modal-meta" id="modal-date"></div>
     <div class="modal-meta" id="modal-location"></div>
@@ -470,25 +468,15 @@ function parseRRULE(s) {
 
 // ── Fetch ─────────────────────────────────────────────────────
 async function fetchCalendar() {
-  const encoded = encodeURIComponent(ICS_URL);
-  // Try proxies in order; corsproxy.io is most reliable for hosted platforms like LibGuides
-  const urls = [
-    'https://corsproxy.io/?' + encoded,
-    'https://api.allorigins.win/raw?url=' + encoded,
-    'https://api.codetabs.com/v1/proxy?quest=' + encoded,
-    ICS_URL,
-  ];
-  for (const url of urls) {
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 8000);
-      const res = await fetch(url, { cache: 'no-store', signal: controller.signal });
-      clearTimeout(timeout);
-      if (!res.ok) continue;
+  // calendar.ics is fetched by GitHub Actions every 30 min and saved to this repo.
+  // Same-origin fetch — no CORS issues.
+  try {
+    const res = await fetch('calendar.ics', { cache: 'no-store' });
+    if (res.ok) {
       const text = await res.text();
       if (text.includes('BEGIN:VCALENDAR')) return text;
-    } catch(e) { /* try next */ }
-  }
+    }
+  } catch(e) { /* fall through */ }
   return null;
 }
 
@@ -652,5 +640,6 @@ document.getElementById('btn-today').addEventListener('click', () => {
   render();
 })();
 </script>
-</body>
-</html>
+
+
+</body></html>
