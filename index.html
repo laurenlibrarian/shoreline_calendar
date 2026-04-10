@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' https://corsproxy.io https://api.allorigins.win https://api.codetabs.com https://outlook.office365.com;">
+<title>Shoreline Calendar</title>
+<style>
+  :root {
+    --brand: #006B3C;
+    --brand-light: #e6f4ee;
+    --brand-mid: #b3d9c9;
+    --text: #1a1a1a;
+    --text-muted: #555;
+    --text-faint: #888;
+    --bg: #ffffff;
+    --bg-surface: #f7f7f5;
+    --border: #e0e0dc;
+    --border-strong: #c8c8c3;
+    --today-bg: #e6f4ee;
+    --today-border: #006B3C;
+    --event-bg: #006B3C;
+    --event-text: #ffffff;
+    --event-allday-bg: #b3d9c9;
+    --event-allday-text: #003d22;
+    --focus: #0057a8;
+    --radius: 6px;
+    --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --brand: #4db88a;
+      --brand-light: #0d2b1e;
+      --brand-mid: #1a4a34;
+      --text: #f0f0ee;
+      --text-muted: #aaa;
+      --text-faint: #777;
+      --bg: #1a1a1a;
+      --bg-surface: #242424;
+      --border: #333;
+      --border-strong: #444;
+      --today-bg: #0d2b1e;
+      --today-border: #4db88a;
+      --event-bg: #1a6644;
+      --event-text: #e0f5ec;
+      --event-allday-bg: #1a4a34;
+      --event-allday-text: #a0d8bc;
+      --focus: #5ba3e8;
+    }
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font);
+    font-size: 15px;
+    color: var(--text);
+    background: var(--bg);
+    line-height: 1.5;
+  }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px;
+    padding: 0; margin: -1px; overflow: hidden;
+    clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+  /* ── Layout ── */
+  #cal {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 1.25rem 1rem 2rem;
+  }
+  /* ── Header ── */
+  .cal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 1rem;
+  }
+  .cal-range {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--text);
+    min-width: 0;
+  }
+  .cal-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  button {
+    font-family: var(--font);
+    font-size: 13px;
+    cursor: pointer;
+    border-radius: var(--radius);
+    border: 1px solid var(--border-strong);
+    background: var(--bg);
+    color: var(--text);
+    padding: 5px 13px;
+    line-height: 1.4;
+    transition: background 0.12s;
+  }
+  button:hover { background: var(--bg-surface); }
+  button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  button.today-btn {
+    border-color: var(--brand);
+    color: var(--brand);
+    font-weight: 500;
+  }
+  button.today-btn:hover { background: var(--brand-light); }
+  .nav-btn { padding: 5px 10px; font-size: 15px; }
+  /* ── Week grid ── */
+  .week-grid {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .day-headers {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-surface);
+  }
+  .day-header {
+    padding: 8px 6px 6px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border-right: 1px solid var(--border);
+  }
+  .day-header:last-child { border-right: none; }
+  .day-header .date-num {
+    display: block;
+    font-size: 20px;
+    font-weight: 300;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--text);
+    margin-top: 2px;
+    line-height: 1.2;
+  }
+  .day-header.is-today { color: var(--brand); }
+  .day-header.is-today .date-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px; height: 32px;
+    background: var(--brand);
+    color: #fff;
+    border-radius: 50%;
+    font-weight: 600;
+    font-size: 16px;
+    margin-top: 2px;
+  }
+  .days-row {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    min-height: 160px;
+    align-items: start;
+  }
+  .day-cell {
+    border-right: 1px solid var(--border);
+    padding: 6px 5px 8px;
+    min-height: 120px;
+    background: var(--bg);
+  }
+  .day-cell:last-child { border-right: none; }
+  .day-cell.is-today { background: var(--today-bg); }
+  .day-cell.other-month { background: var(--bg-surface); opacity: 0.6; }
+  /* ── Events ── */
+  .event-pill {
+    display: block;
+    background: var(--event-bg);
+    color: var(--event-text);
+    border-radius: 4px;
+    padding: 3px 6px;
+    font-size: 11.5px;
+    line-height: 1.35;
+    margin-bottom: 3px;
+    overflow: hidden;
+    cursor: pointer;
+    text-decoration: none;
+    transition: opacity 0.12s;
+  }
+  .event-pill:hover, .event-pill:focus { opacity: 0.85; }
+  .event-pill:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+  .event-pill.all-day {
+    background: var(--event-allday-bg);
+    color: var(--event-allday-text);
+  }
+  .event-time {
+    font-size: 10px;
+    opacity: 0.8;
+    display: block;
+    margin-bottom: 1px;
+  }
+  .event-title { font-weight: 500; word-break: break-word; }
+  .more-link {
+    font-size: 11px;
+    color: var(--text-faint);
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 3px;
+    background: none;
+    border: none;
+    display: block;
+    text-align: left;
+  }
+  .more-link:hover { color: var(--brand); background: var(--brand-light); }
+  /* ── Modal ── */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.45);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100;
+    padding: 1rem;
+  }
+  .modal {
+    background: var(--bg);
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    max-width: 420px;
+    width: 100%;
+    padding: 1.25rem 1.5rem 1.5rem;
+    position: relative;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  .modal-close {
+    position: absolute; top: 10px; right: 12px;
+    background: none; border: none;
+    font-size: 20px; cursor: pointer;
+    color: var(--text-muted);
+    padding: 4px 8px;
+    border-radius: 4px;
+    line-height: 1;
+  }
+  .modal-close:hover { background: var(--bg-surface); }
+  .modal-close:focus-visible { outline: 2px solid var(--focus); }
+  .modal-title { font-size: 17px; font-weight: 600; margin-bottom: .5rem; padding-right: 2rem; }
+  .modal-meta { font-size: 13px; color: var(--text-muted); margin-bottom: .35rem; }
+  .modal-desc { font-size: 13px; color: var(--text); margin-top: .5rem; line-height: 1.6; white-space: pre-wrap; }
+  /* ── Status ── */
+  #status {
+    text-align: center;
+    padding: 2.5rem 1rem;
+    color: var(--text-muted);
+    font-size: 14px;
+  }
+  .status-error { color: #c0392b; }
+  /* ── Footer ── */
+  .cal-footer {
+    margin-top: .75rem;
+    font-size: 11px;
+    color: var(--text-faint);
+    text-align: right;
+  }
+  /* ── Responsive ── */
+  @media (max-width: 600px) {
+    .day-header .dow { display: none; }
+    .day-header .dow-short { display: block !important; }
+    .event-pill { font-size: 10.5px; padding: 2px 4px; }
+  }
+  .dow-short { display: none; }
+</style>
+</head>
+<body>
+<main id="cal" role="main">
+  <h1 class="sr-only">Shoreline College Calendar – Week View</h1>
+
+  <div class="cal-head" role="toolbar" aria-label="Calendar navigation">
+    <div class="cal-range" id="range-label" aria-live="polite" aria-atomic="true"></div>
+    <div class="cal-controls">
+      <button class="today-btn" id="btn-today" aria-label="Go to today's week">Today</button>
+      <button class="nav-btn" id="btn-prev" aria-label="Previous week">&#8249;</button>
+      <button class="nav-btn" id="btn-next" aria-label="Next week">&#8250;</button>
+    </div>
+  </div>
+
+  <div id="status" role="status" aria-live="polite">Loading calendar…</div>
+
+  <div id="grid-wrap" hidden>
+    <div class="week-grid" role="grid" aria-label="Week calendar">
+      <div class="day-headers" role="row" aria-label="Days of the week">
+        <!-- injected -->
+      </div>
+      <div class="days-row" role="row" id="days-row">
+        <!-- injected -->
+      </div>
+    </div>
+    <p class="cal-footer">Calendar data from Shoreline College · Updates every ~30 min</p>
+  </div>
+</main>
+
+<!-- Event detail modal (hidden until triggered) -->
+<div class="modal-backdrop" id="modal-backdrop" hidden role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div class="modal" id="modal">
+    <button class="modal-close" id="modal-close" aria-label="Close event details">&#x2715;</button>
+    <div class="modal-title" id="modal-title"></div>
+    <div class="modal-meta" id="modal-date"></div>
+    <div class="modal-meta" id="modal-location"></div>
+    <div class="modal-desc" id="modal-desc"></div>
+  </div>
+</div>
+
+<script>
+const ICS_URL = 'https://outlook.office365.com/owa/calendar/f3ba4e62469a4e68a519c2a475ac630a@shoreline.edu/463717dcbd764361a85485322f44055210645257784221443501/reachcalendar.ics';
+let allEvents = [];
+let weekStart = getWeekStart(new Date());
+
+// ── Date helpers ──────────────────────────────────────────────
+function getWeekStart(d) {
+  const day = new Date(d);
+  day.setHours(0, 0, 0, 0);
+  const dow = day.getDay(); // 0 = Sun
+  day.setDate(day.getDate() - dow);
+  return day;
+}
+
+function addDays(d, n) {
+  const r = new Date(d);
+  r.setDate(r.getDate() + n);
+  return r;
+}
+
+function isSameDay(a, b) {
+  return a.getFullYear() === b.getFullYear() &&
+         a.getMonth() === b.getMonth() &&
+         a.getDate() === b.getDate();
+}
+
+function isToday(d) { return isSameDay(d, new Date()); }
+
+function fmtDate(d) {
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+function fmtTime(d) {
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+}
+
+function fmtRangeLabel(ws) {
+  const we = addDays(ws, 6);
+  const opts = { month: 'long', day: 'numeric' };
+  if (ws.getMonth() === we.getMonth()) {
+    return ws.toLocaleDateString('en-US', opts) + '–' + we.getDate() + ', ' + ws.getFullYear();
+  }
+  return ws.toLocaleDateString('en-US', opts) + ' – ' + we.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) + ', ' + we.getFullYear();
+}
+
+// ── ICS Parsing ───────────────────────────────────────────────
+function parseICS(text) {
+  const lines = text.replace(/\r\n /g, '').replace(/\r\n\t/g, '').split(/\r?\n/);
+  const events = [];
+  let cur = null;
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (line === 'BEGIN:VEVENT') { cur = {}; continue; }
+    if (line === 'END:VEVENT') { if (cur) events.push(cur); cur = null; continue; }
+    if (!cur) continue;
+
+    const colon = line.indexOf(':');
+    if (colon < 0) continue;
+    const key = line.slice(0, colon).toUpperCase();
+    const val = line.slice(colon + 1).trim();
+
+    if (key.startsWith('DTSTART')) {
+      cur.start = parseICSDate(key, val);
+      cur.allDay = key.includes('VALUE=DATE') || (!key.includes('T') && val.length === 8);
+    } else if (key.startsWith('DTEND')) {
+      cur.end = parseICSDate(key, val);
+    } else if (key === 'SUMMARY') {
+      cur.title = unescapeICS(val);
+    } else if (key === 'DESCRIPTION') {
+      cur.description = unescapeICS(val);
+    } else if (key === 'LOCATION') {
+      cur.location = unescapeICS(val);
+    } else if (key === 'UID') {
+      cur.uid = val;
+    } else if (key === 'RRULE') {
+      cur.rrule = val;
+    }
+  }
+  return events;
+}
+
+function parseICSDate(key, val) {
+  // All-day: YYYYMMDD
+  if (val.length === 8) {
+    return new Date(
+      parseInt(val.slice(0,4)),
+      parseInt(val.slice(4,6)) - 1,
+      parseInt(val.slice(6,8))
+    );
+  }
+  // UTC: ends in Z
+  if (val.endsWith('Z')) {
+    return new Date(
+      Date.UTC(
+        parseInt(val.slice(0,4)),
+        parseInt(val.slice(4,6)) - 1,
+        parseInt(val.slice(6,8)),
+        parseInt(val.slice(9,11)),
+        parseInt(val.slice(11,13)),
+        parseInt(val.slice(13,15))
+      )
+    );
+  }
+  // Local float
+  return new Date(
+    parseInt(val.slice(0,4)),
+    parseInt(val.slice(4,6)) - 1,
+    parseInt(val.slice(6,8)),
+    parseInt(val.slice(9,11)),
+    parseInt(val.slice(11,13)),
+    parseInt(val.slice(13,15))
+  );
+}
+
+function unescapeICS(s) {
+  return s.replace(/\\n/g, '\n').replace(/\\,/g, ',').replace(/\\;/g, ';').replace(/\\\\/g, '\\');
+}
+
+// Expand simple repeating events within a window
+function expandEvents(events, from, to) {
+  const result = [];
+  for (const ev of events) {
+    if (!ev.start) continue;
+    if (!ev.rrule) {
+      if (ev.start <= to && (!ev.end || ev.end >= from)) result.push(ev);
+      continue;
+    }
+    // Basic RRULE expansion (WEEKLY/DAILY within view window)
+    const rule = parseRRULE(ev.rrule);
+    if (!rule) { result.push(ev); continue; }
+    const duration = ev.end ? ev.end - ev.start : 0;
+    let cur = new Date(ev.start);
+    let count = 0;
+    const maxCount = rule.count || 500;
+    const until = rule.until || to;
+    while (cur <= (until < to ? until : to) && count < maxCount) {
+      if (cur >= from) {
+        result.push({ ...ev, start: new Date(cur), end: duration ? new Date(cur.getTime() + duration) : null, uid: ev.uid + '_' + cur.getTime() });
+      }
+      if (rule.freq === 'DAILY') cur = addDays(cur, rule.interval || 1);
+      else if (rule.freq === 'WEEKLY') cur = addDays(cur, 7 * (rule.interval || 1));
+      else if (rule.freq === 'MONTHLY') { cur = new Date(cur); cur.setMonth(cur.getMonth() + (rule.interval || 1)); }
+      else break;
+      count++;
+    }
+  }
+  return result;
+}
+
+function parseRRULE(s) {
+  const parts = {};
+  for (const p of s.split(';')) {
+    const [k, v] = p.split('=');
+    parts[k] = v;
+  }
+  const r = { freq: parts.FREQ };
+  if (parts.INTERVAL) r.interval = parseInt(parts.INTERVAL);
+  if (parts.COUNT) r.count = parseInt(parts.COUNT);
+  if (parts.UNTIL) r.until = parseICSDate('UNTIL', parts.UNTIL);
+  return r;
+}
+
+// ── Fetch ─────────────────────────────────────────────────────
+async function fetchCalendar() {
+  const encoded = encodeURIComponent(ICS_URL);
+  // Try proxies in order; corsproxy.io is most reliable for hosted platforms like LibGuides
+  const urls = [
+    'https://corsproxy.io/?' + encoded,
+    'https://api.allorigins.win/raw?url=' + encoded,
+    'https://api.codetabs.com/v1/proxy?quest=' + encoded,
+    ICS_URL,
+  ];
+  for (const url of urls) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+      const res = await fetch(url, { cache: 'no-store', signal: controller.signal });
+      clearTimeout(timeout);
+      if (!res.ok) continue;
+      const text = await res.text();
+      if (text.includes('BEGIN:VCALENDAR')) return text;
+    } catch(e) { /* try next */ }
+  }
+  return null;
+}
+
+// ── Render ────────────────────────────────────────────────────
+function render() {
+  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const rangeFrom = days[0];
+  const rangeTo = addDays(days[6], 1);
+
+  document.getElementById('range-label').textContent = fmtRangeLabel(weekStart);
+
+  const weekEvents = expandEvents(allEvents, rangeFrom, rangeTo);
+
+  // Headers
+  const headerRow = document.querySelector('.day-headers');
+  headerRow.innerHTML = '';
+  const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const DOWLONG = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+  days.forEach((day, i) => {
+    const th = document.createElement('div');
+    th.className = 'day-header' + (isToday(day) ? ' is-today' : '');
+    th.setAttribute('role', 'columnheader');
+    th.setAttribute('scope', 'col');
+    th.setAttribute('aria-label', DOWLONG[i] + ', ' + fmtDate(day));
+    th.innerHTML = `<span class="dow" aria-hidden="true">${DOW[i]}</span><span class="dow-short" aria-hidden="true">${DOW[i][0]}</span><span class="date-num" aria-hidden="true">${day.getDate()}</span>`;
+    headerRow.appendChild(th);
+  });
+
+  // Day cells
+  const daysRow = document.getElementById('days-row');
+  daysRow.innerHTML = '';
+
+  days.forEach((day, i) => {
+    const cell = document.createElement('div');
+    cell.className = 'day-cell' + (isToday(day) ? ' is-today' : '');
+    cell.setAttribute('role', 'gridcell');
+    cell.setAttribute('aria-label', fmtDate(day));
+
+    const dayEvs = weekEvents
+      .filter(ev => isSameDay(ev.start, day))
+      .sort((a, b) => {
+        if (a.allDay && !b.allDay) return -1;
+        if (!a.allDay && b.allDay) return 1;
+        return a.start - b.start;
+      });
+
+    const MAX_SHOW = 4;
+    dayEvs.slice(0, MAX_SHOW).forEach(ev => {
+      const pill = document.createElement('button');
+      pill.className = 'event-pill' + (ev.allDay ? ' all-day' : '');
+      pill.setAttribute('aria-label', (ev.allDay ? 'All day: ' : fmtTime(ev.start) + ': ') + ev.title);
+      pill.setAttribute('type', 'button');
+      if (!ev.allDay) {
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'event-time';
+        timeSpan.textContent = fmtTime(ev.start);
+        pill.appendChild(timeSpan);
+      }
+      const titleSpan = document.createElement('span');
+      titleSpan.className = 'event-title';
+      titleSpan.textContent = ev.title || '(No title)';
+      pill.appendChild(titleSpan);
+      pill.addEventListener('click', () => openModal(ev));
+      cell.appendChild(pill);
+    });
+
+    if (dayEvs.length > MAX_SHOW) {
+      const more = document.createElement('button');
+      more.className = 'more-link';
+      more.type = 'button';
+      const extra = dayEvs.length - MAX_SHOW;
+      more.textContent = `+${extra} more`;
+      more.setAttribute('aria-label', `Show ${extra} more events on ${fmtDate(day)}`);
+      more.addEventListener('click', () => showAllDay(day, dayEvs));
+      cell.appendChild(more);
+    }
+
+    daysRow.appendChild(cell);
+  });
+
+  document.getElementById('grid-wrap').hidden = false;
+  document.getElementById('status').hidden = true;
+}
+
+// ── Modal ─────────────────────────────────────────────────────
+function openModal(ev) {
+  document.getElementById('modal-title').textContent = ev.title || '(No title)';
+  if (ev.allDay) {
+    document.getElementById('modal-date').textContent = 'All day · ' + fmtDate(ev.start);
+  } else {
+    const endStr = ev.end ? ' – ' + fmtTime(ev.end) : '';
+    document.getElementById('modal-date').textContent = fmtDate(ev.start) + '  ·  ' + fmtTime(ev.start) + endStr;
+  }
+  const loc = ev.location || '';
+  const locEl = document.getElementById('modal-location');
+  locEl.textContent = loc ? '📍 ' + loc : '';
+  locEl.hidden = !loc;
+  document.getElementById('modal-desc').textContent = ev.description || '';
+  const backdrop = document.getElementById('modal-backdrop');
+  backdrop.hidden = false;
+  document.getElementById('modal-close').focus();
+  document.addEventListener('keydown', handleModalKey);
+}
+
+function showAllDay(day, events) {
+  document.getElementById('modal-title').textContent = fmtDate(day);
+  document.getElementById('modal-date').textContent = events.length + ' events';
+  document.getElementById('modal-location').textContent = '';
+  document.getElementById('modal-desc').textContent = events.map(e =>
+    (e.allDay ? 'All day' : fmtTime(e.start)) + ': ' + (e.title || '(No title)')
+  ).join('\n');
+  const backdrop = document.getElementById('modal-backdrop');
+  backdrop.hidden = false;
+  document.getElementById('modal-close').focus();
+  document.addEventListener('keydown', handleModalKey);
+}
+
+function closeModal() {
+  document.getElementById('modal-backdrop').hidden = true;
+  document.removeEventListener('keydown', handleModalKey);
+}
+
+function handleModalKey(e) {
+  if (e.key === 'Escape') closeModal();
+}
+
+document.getElementById('modal-close').addEventListener('click', closeModal);
+document.getElementById('modal-backdrop').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeModal();
+});
+
+// ── Nav ───────────────────────────────────────────────────────
+document.getElementById('btn-prev').addEventListener('click', () => {
+  weekStart = addDays(weekStart, -7);
+  render();
+});
+document.getElementById('btn-next').addEventListener('click', () => {
+  weekStart = addDays(weekStart, 7);
+  render();
+});
+document.getElementById('btn-today').addEventListener('click', () => {
+  weekStart = getWeekStart(new Date());
+  render();
+});
+
+// ── Init ──────────────────────────────────────────────────────
+(async () => {
+  const text = await fetchCalendar();
+  const statusEl = document.getElementById('status');
+  if (!text) {
+    statusEl.className = 'status-error';
+    statusEl.innerHTML = 'Could not load calendar data due to browser security restrictions (CORS).<br><br>To fix this permanently, see the instructions below the calendar, or ask your web developer to add a server-side proxy for the ICS feed.<br><br><a href="' + ICS_URL + '" style="color:inherit;text-decoration:underline">Click here to verify the feed is reachable</a>.';
+    return;
+  }
+  allEvents = parseICS(text);
+  if (allEvents.length === 0) {
+    statusEl.textContent = 'No events found in calendar.';
+    return;
+  }
+  render();
+})();
+</script>
+</body>
+</html>
