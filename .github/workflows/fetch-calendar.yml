@@ -1,0 +1,39 @@
+name: Fetch Calendar
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"   # every 30 minutes
+  workflow_dispatch:          # lets you run it manually from the Actions tab
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Download ICS from Outlook
+        run: |
+          curl -fSL \
+            -A "Mozilla/5.0 (compatible; shoreline-calendar-fetcher)" \
+            "https://outlook.office365.com/owa/calendar/f3ba4e62469a4e68a519c2a475ac630a@shoreline.edu/463717dcbd764361a85485322f44055210645257784221443501/calendar.ics" \
+            -o calendar.ics
+          echo "Downloaded $(wc -c < calendar.ics) bytes"
+          head -n 5 calendar.ics
+
+      - name: Commit if changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet calendar.ics; then
+            git add calendar.ics
+            git commit -m "chore: refresh calendar.ics"
+            git push
+          else
+            echo "No changes."
+          fi
