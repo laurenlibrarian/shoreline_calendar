@@ -262,34 +262,31 @@
     .event-pill { font-size: 10.5px; padding: 2px 4px; }
   }
   .dow-short { display: none; }
-  /* === Accessibility & UX fixes === */
+/* === Accessibility & UX fixes === */
 
-/* 1. Hide the event-details modal when its `hidden` attribute is set.
-      The existing rule .modal-backdrop { display: flex } overrides
-      the browser's default [hidden] { display: none }, so we add a
-      more specific selector that respects the attribute.            */
+/* 1. Hide the event-details modal when its `hidden` attribute is set. */
 .modal-backdrop[hidden] { display: none; }
 
-/* 2. WCAG 2.1 AA contrast — light mode overrides
-      (later :root with same specificity wins by source order)        */
+/* 2. WCAG 2.1 AA contrast — light mode overrides */
 :root {
-  --text-faint: #717171;     /* was #888  — now 4.88:1 on white */
-  --border: #8e8e8e;         /* was #e0e0dc — now 3.28:1 on white */
-  --border-strong: #717171;  /* was #c8c8c3 — now 4.88:1 on white */
+  --text-faint: #717171;
+  --border: #8e8e8e;
+  --border-strong: #717171;
 }
 
 /* 3. WCAG 2.1 AA contrast — dark mode overrides */
 @media (prefers-color-scheme: dark) {
   :root {
-    --text-faint: #8e8e8e;   /* was #777 — now 5.31:1 on #1a1a1a */
-    --border: #6e6e6e;       /* was #333 — now 3.41:1 on #1a1a1a */
-    --border-strong: #8e8e8e;/* was #444 — now 5.31:1 on #1a1a1a */
+    --text-faint: #8e8e8e;
+    --border: #6e6e6e;
+    --border-strong: #8e8e8e;
   }
 }
-  /* Hide the data-source attribution line at the bottom */
-footer { display: none; }
 
-/* Suppress the iframe scrollbar */
+/* 4. Hide the data-source attribution line at the bottom */
+.cal-footer { display: none; }
+
+/* 5. Suppress the iframe scrollbar */
 html, body { overflow: hidden; }
 </style>
 </head>
