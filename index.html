@@ -355,6 +355,12 @@ function isSameDay(a, b) {
          a.getDate() === b.getDate();
 }
 
+// Calendar end dates are exclusive. A midnight end belongs to the preceding day.
+function occursOnDay(ev, day) {
+  if (!ev.end || ev.end <= ev.start) return isSameDay(ev.start, day);
+  return ev.start < addDays(day, 1) && ev.end > day;
+}
+
 function isToday(d) { return isSameDay(d, new Date()); }
 
 function fmtDate(d) {
@@ -466,7 +472,7 @@ function expandEvents(events, from, to) {
     const maxCount = rule.count || 500;
     const until = rule.until || to;
     while (cur <= (until < to ? until : to) && count < maxCount) {
-      if (cur >= from) {
+      if (cur >= from || cur.getTime() + duration > from.getTime()) {
         result.push({ ...ev, start: new Date(cur), end: duration ? new Date(cur.getTime() + duration) : null, uid: ev.uid + '_' + cur.getTime() });
       }
       if (rule.freq === 'DAILY') cur = addDays(cur, rule.interval || 1);
@@ -543,7 +549,7 @@ function render() {
     cell.setAttribute('aria-label', fmtDate(day));
 
     const dayEvs = weekEvents
-      .filter(ev => isSameDay(ev.start, day))
+      .filter(ev => occursOnDay(ev, day))
       .sort((a, b) => {
         if (a.allDay && !b.allDay) return -1;
         if (!a.allDay && b.allDay) return 1;
